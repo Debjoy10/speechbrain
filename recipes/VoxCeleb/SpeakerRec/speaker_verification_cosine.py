@@ -149,11 +149,12 @@ def get_verification_scores(veri_test):
 def dataio_prep(params):
     "Creates the dataloaders and their data processing pipelines."
 
-    data_folder = params["data_folder"]
+    vox1_data_folder = params["vox1_data_folder"]
+    vox2_data_folder = params["vox2_data_folder"]
 
     # Train data (used for normalization)
     train_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
-        csv_path=params["train_data"], replacements={"data_root": data_folder},
+        csv_path=params["train_data"], replacements={"data_root": vox2_data_folder},
     )
     train_data = train_data.filtered_sorted(
         sort_key="duration", select_n=params["n_train_snts"]
@@ -161,13 +162,13 @@ def dataio_prep(params):
 
     # Enrol data
     enrol_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
-        csv_path=params["enrol_data"], replacements={"data_root": data_folder},
+        csv_path=params["enrol_data"], replacements={"data_root": vox1_data_folder},
     )
     enrol_data = enrol_data.filtered_sorted(sort_key="duration")
 
     # Test data
     test_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
-        csv_path=params["test_data"], replacements={"data_root": data_folder},
+        csv_path=params["test_data"], replacements={"data_root": vox1_data_folder},
     )
     test_data = test_data.filtered_sorted(sort_key="duration")
 
@@ -222,7 +223,7 @@ if __name__ == "__main__":
     )
     download_file(params["verification_file"], veri_file_path)
 
-    from voxceleb_prepare import prepare_voxceleb  # noqa E402
+    from absp_voxceleb_prepare import prepare_voxceleb  # noqa E402
 
     # Create experiment directory
     sb.core.create_experiment_directory(
@@ -233,7 +234,8 @@ if __name__ == "__main__":
 
     # Prepare data from dev of Voxceleb1
     prepare_voxceleb(
-        data_folder=params["data_folder"],
+        vox2_data_folder=params["vox2_data_folder"],
+        vox1_data_folder=params["vox1_data_folder"],
         save_folder=params["save_folder"],
         verification_pairs_file=veri_file_path,
         splits=["train", "dev", "test"],
