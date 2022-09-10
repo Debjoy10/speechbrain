@@ -30,10 +30,12 @@ SAMPLERATE = 16000
 
 
 def prepare_voxceleb(
+    vox2022_data_folder,
     vox2_data_folder,
     vox1_data_folder,
     save_folder,
     verification_pairs_file,
+    test_verification_pairs_file,
     splits=["train", "dev", "test"],
     split_ratio=[90, 10], # Train - Dev Split for PLDA only.
     seg_dur=3.0,
@@ -90,6 +92,7 @@ def prepare_voxceleb(
         return
     # Create configuration for easily skipping data_preparation stage
     conf = {
+        "vox2022_data_folder": vox2022_data_folder,
         "vox2_data_folder": vox2_data_folder,
         "vox1_data_folder": vox1_data_folder,
         "splits": splits,
@@ -124,7 +127,7 @@ def prepare_voxceleb(
             )
 
     # Check if this phase is already done (if so, skip it)
-    if skip(splits, save_folder, conf) or True:
+    if skip(splits, save_folder, conf):
         logger.info("Skipping preparation, completed in previous run.")
         return
 
@@ -159,6 +162,12 @@ def prepare_voxceleb(
             [vox1_data_folder], save_folder, verification_pairs_file
         )
 
+    # For PLDA verification testing
+    if "test2022" in splits:
+        prepare_csv_enrol_test_2022(
+            [vox2022_data_folder], save_folder, test_verification_pairs_file
+        )
+
     # Saving options (useful to skip this phase when already done)
     save_pkl(conf, save_opt)
 
@@ -182,6 +191,8 @@ def skip(splits, save_folder, conf):
         "dev": DEV_CSV,
         "test": TEST_CSV,
         "enrol": ENROL_CSV,
+        "test2022": '2022_'+TEST_CSV,
+        "enrol2022": '2022_'+ENROL_CSV
     }
     for split in splits:
         if not os.path.isfile(os.path.join(save_folder, split_files[split])):
@@ -190,6 +201,7 @@ def skip(splits, save_folder, conf):
     save_opt = os.path.join(save_folder, OPT_FILE)
     if skip is True:
         if os.path.isfile(save_opt):
+            return True
             opts_old = load_pkl(save_opt)
             if opts_old == conf:
                 skip = True
@@ -269,13 +281,13 @@ def _get_utt_split_lists(
 
         test_spks = [snt.split("/")[0] for snt in test_lst]
 
-        path = os.path.join(data_folder, "wav", "**", "*.wav")
+        path = os.path.join(data_folder, "**", "*.wav")
 
         if split_speaker:
             # avoid test speakers for train and dev splits
             audio_files_dict = {}
             for f in glob.glob(path, recursive=True):
-                spk_id = f.split("/wav/")[1].split("/")[0]
+                spk_id = f.split("/")[-2]
                 if spk_id not in test_spks:
                     audio_files_dict.setdefault(spk_id, []).append(f)
 
@@ -292,7 +304,7 @@ def _get_utt_split_lists(
             audio_files_list = []
             for f in glob.glob(path, recursive=True):
                 try:
-                    spk_id = f.split("/wav/")[1].split("/")[0]
+                    spk_id = f.split("/")[-2]
                 except ValueError:
                     logger.info(f"Malformed path: {f}")
                     continue
@@ -524,6 +536,118 @@ def prepare_csv_enrol_test(data_folders, save_folder, verification_pairs_file):
 
         csv_output = csv_output_head + test_csv
         csv_file = os.path.join(save_folder, TEST_CSV)
+
+        # Writing the csv lines
+        with open(csv_file, mode="w") as csv_f:
+            csv_writer = csv.writer(
+                csv_f, delimiter=",", quotechar='"', quoting=csv.QUOTE_MINIMAL
+            )
+            for line in csv_output:
+                csv_writer.writerow(line)
+
+
+def prepare_csv_enrol_test_2022(data_folders, save_folder, verification_pairs_file):
+    """
+    Creates the csv file for test data (useful for verification)
+
+    Arguments
+    ---------
+    data_folder : str
+        Path of the data folders
+    save_folder : str
+        The directory where to store the csv files.
+
+    Returns
+    -------
+    None
+    """
+
+    # msg = '\t"Creating csv lists in  %s..."' % (csv_file)
+    # logger.debug(msg)
+
+    csv_output_head = [
+        ["ID", "duration", "wav", "start", "stop", "spk_id"]
+    ]  # noqa E231
+
+    for data_folder in data_folders:
+
+        test_lst_file = verification_pairs_file
+
+        enrol_ids, test_ids = [], []
+
+        # Get unique ids (enrol and test utterances)
+        for line in open(test_lst_file):
+            e_id = line.split(" ")[0].rstrip().split(".")[0].strip()
+            t_id = line.split(" ")[1].rstrip().split(".")[0].strip()
+            enrol_ids.append(e_id)
+            test_ids.append(t_id)
+
+        enrol_ids = list(np.unique(np.array(enrol_ids)))
+        test_ids = list(np.unique(np.array(test_ids)))
+
+        # Prepare enrol csv
+        logger.info("preparing enrol csv")
+        enrol_csv = []
+        for id in tqdm(enrol_ids):
+            wav = data_folder + '/' + id + ".wav"
+
+            # Reading the signal (to retrieve duration in seconds)
+            signal, fs = torchaudio.load(wav)
+            signal = signal.squeeze(0)
+            audio_duration = signal.shape[0] / SAMPLERATE
+            start_sample = 0
+            stop_sample = signal.shape[0]
+            [spk_id, sess_id, utt_id] = wav.split("/")[-3:]
+
+            csv_line = [
+                id,
+                audio_duration,
+                wav,
+                start_sample,
+                stop_sample,
+                spk_id,
+            ]
+
+            enrol_csv.append(csv_line)
+
+        csv_output = csv_output_head + enrol_csv
+        csv_file = os.path.join(save_folder, '2022_'+ENROL_CSV)
+
+        # Writing the csv lines
+        with open(csv_file, mode="w") as csv_f:
+            csv_writer = csv.writer(
+                csv_f, delimiter=",", quotechar='"', quoting=csv.QUOTE_MINIMAL
+            )
+            for line in csv_output:
+                csv_writer.writerow(line)
+
+        # Prepare test csv
+        logger.info("preparing test csv")
+        test_csv = []
+        for id in tqdm(test_ids):
+            wav = data_folder + '/' + id + ".wav"
+
+            # Reading the signal (to retrieve duration in seconds)
+            signal, fs = torchaudio.load(wav)
+            signal = signal.squeeze(0)
+            audio_duration = signal.shape[0] / SAMPLERATE
+            start_sample = 0
+            stop_sample = signal.shape[0]
+            [spk_id, sess_id, utt_id] = wav.split("/")[-3:]
+
+            csv_line = [
+                id,
+                audio_duration,
+                wav,
+                start_sample,
+                stop_sample,
+                spk_id,
+            ]
+
+            test_csv.append(csv_line)
+
+        csv_output = csv_output_head + test_csv
+        csv_file = os.path.join(save_folder, '2022_'+TEST_CSV)
 
         # Writing the csv lines
         with open(csv_file, mode="w") as csv_f:

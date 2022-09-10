@@ -36,10 +36,9 @@ enrol_data: !ref <save_folder>/enrol.csv
 test_data: !ref <save_folder>/test.csv
 test_enrol_data: !ref <save_folder>/2022_enrol.csv
 test_test_data: !ref <save_folder>/2022_test.csv
-test: False
+test: True
 
 batch_size: 1
-# Score norm utilises the training data to create cohorts
 # score_norm: s-norm  # z-norm t-norm s-norm (uncomment to enable it)
 cohort_size: 20000 # amount of imposter utterances in normalization cohort
 n_train_snts: 400000 # used for normalization stats

@@ -13,6 +13,7 @@ Authors
 """
 import os
 import sys
+import json
 import torch
 import logging
 import torchaudio
@@ -56,7 +57,6 @@ def compute_embedding_loop(data_loader):
             seg_ids = batch.id
             wavs, lens = batch.sig
             # Restricting Size of Wav Tensor based on GPU size constraints
-            # To change in new script
             wavs = wavs[:, :200000]
 
             found = False
@@ -70,6 +70,84 @@ def compute_embedding_loop(data_loader):
             for i, seg_id in enumerate(seg_ids):
                 embedding_dict[seg_id] = emb[i].detach().clone()
     return embedding_dict
+
+
+def get_verification_scores_test(veri_test):
+    """Computes positive and negative scores given the test split."""
+    scores = []
+    save_file = os.path.join(params["output_folder"], "test_scores.txt" )
+    s_file = open(save_file, "w")
+
+    # Cosine similarity initialization
+    similarity = torch.nn.CosineSimilarity(dim=-1, eps=1e-6)
+
+    # creating cohort for score normalization
+    if "score_norm" in params:
+        train_cohort = torch.stack(list(train_dict.values()))
+
+    for i, line in tqdm(enumerate(veri_test), total = len(veri_test)):
+
+        # Reading verification file (enrol_file test_file label)
+        enrol_id = line.split(" ")[0].rstrip().split(".")[0].strip()
+        test_id = line.split(" ")[1].rstrip().split(".")[0].strip()
+        enrol_idx = key2id['test_enrol'][enrol_id]
+        test_idx = key2id['test_test'][test_id]
+
+        # Compute Embeddings
+        enrol_wavs = enrol_data[enrol_idx]['sig'][:200000].unsqueeze(0)
+        enrol_lens = torch.tensor([1.])
+        enrol_wavs, enrol_lens = enrol_wavs.to(params["device"]), enrol_lens.to(params["device"])
+        enrol = compute_embedding(enrol_wavs, enrol_lens).unsqueeze(1).detach().clone()
+        test_wavs = test_data[test_idx]['sig'][:200000].unsqueeze(0)
+        test_lens = torch.tensor([1.])
+        test_wavs, test_lens = test_wavs.to(params["device"]), test_lens.to(params["device"])
+        test = compute_embedding(test_wavs, test_lens).unsqueeze(1).detach().clone()
+
+        if "score_norm" in params:
+            # Getting norm stats for enrol impostors
+            enrol_rep = enrol.repeat(train_cohort.shape[0], 1, 1)
+            score_e_c = similarity(enrol_rep, train_cohort)
+
+            if "cohort_size" in params:
+                score_e_c = torch.topk(
+                    score_e_c, k=params["cohort_size"], dim=0
+                )[0]
+
+            mean_e_c = torch.mean(score_e_c, dim=0)
+            std_e_c = torch.std(score_e_c, dim=0)
+
+            # Getting norm stats for test impostors
+            test_rep = test.repeat(train_cohort.shape[0], 1, 1)
+            score_t_c = similarity(test_rep, train_cohort)
+
+            if "cohort_size" in params:
+                score_t_c = torch.topk(
+                    score_t_c, k=params["cohort_size"], dim=0
+                )[0]
+
+            mean_t_c = torch.mean(score_t_c, dim=0)
+            std_t_c = torch.std(score_t_c, dim=0)
+
+        # Compute the score for the given sentence
+        score = similarity(enrol, test)[0]
+
+        # Perform score normalization
+        if "score_norm" in params:
+            if params["score_norm"] == "z-norm":
+                score = (score - mean_e_c) / std_e_c
+            elif params["score_norm"] == "t-norm":
+                score = (score - mean_t_c) / std_t_c
+            elif params["score_norm"] == "s-norm":
+                score_e = (score - mean_e_c) / std_e_c
+                score_t = (score - mean_t_c) / std_t_c
+                score = 0.5 * (score_e + score_t)
+
+        # write score file
+        s_file.write("%s %s %f\n" % (enrol_id, test_id, score))
+        scores.append(score)
+
+    s_file.close()
+    return scores
 
 
 def get_verification_scores(veri_test):
@@ -88,14 +166,24 @@ def get_verification_scores(veri_test):
     if "score_norm" in params:
         train_cohort = torch.stack(list(train_dict.values()))
 
-    for i, line in enumerate(veri_test):
+    for i, line in tqdm(enumerate(veri_test), total = len(veri_test)):
 
         # Reading verification file (enrol_file test_file label)
         lab_pair = int(line.split(" ")[0].rstrip().split(".")[0].strip())
         enrol_id = line.split(" ")[1].rstrip().split(".")[0].strip()
         test_id = line.split(" ")[2].rstrip().split(".")[0].strip()
-        enrol = enrol_dict[enrol_id]
-        test = test_dict[test_id]
+        enrol_idx = key2id['enrol'][enrol_id]
+        test_idx = key2id['test'][test_id]
+
+        # Compute Embeddings
+        enrol_wavs = enrol_data[enrol_idx]['sig'][:200000].unsqueeze(0)
+        enrol_lens = torch.tensor([1.])
+        enrol_wavs, enrol_lens = enrol_wavs.to(params["device"]), enrol_lens.to(params["device"])
+        enrol = compute_embedding(enrol_wavs, enrol_lens).unsqueeze(1).detach().clone()
+        test_wavs = test_data[test_idx]['sig'][:200000].unsqueeze(0)
+        test_lens = torch.tensor([1.])
+        test_wavs, test_lens = test_wavs.to(params["device"]), test_lens.to(params["device"])
+        test = compute_embedding(test_wavs, test_lens).unsqueeze(1).detach().clone()
 
         if "score_norm" in params:
             # Getting norm stats for enrol impostors
@@ -148,12 +236,13 @@ def get_verification_scores(veri_test):
     s_file.close()
     return positive_scores, negative_scores
 
-
+# Either normal verification eval or test eval - Specify
 def dataio_prep(params):
     "Creates the dataloaders and their data processing pipelines."
 
     vox1_data_folder = params["vox1_data_folder"]
     vox2_data_folder = params["vox2_data_folder"]
+    vox2022_data_folder = params["vox2022_data_folder"]
 
     # Train data (used for normalization)
     train_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
@@ -175,7 +264,20 @@ def dataio_prep(params):
     )
     test_data = test_data.filtered_sorted(sort_key="duration")
 
-    datasets = [train_data, enrol_data, test_data]
+    ############ TEST SPLIT
+    # Enrol data
+    test_enrol_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
+        csv_path=params["test_enrol_data"], replacements={"data_root": vox2022_data_folder},
+    )
+    test_enrol_data = test_enrol_data.filtered_sorted(sort_key="duration")
+
+    # Test data
+    test_test_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
+        csv_path=params["test_test_data"], replacements={"data_root": vox2022_data_folder},
+    )
+    test_test_data = test_test_data.filtered_sorted(sort_key="duration")
+
+    datasets = [train_data, enrol_data, test_data, test_enrol_data, test_test_data]
 
     # Define audio pipeline
     @sb.utils.data_pipeline.takes("wav", "start", "stop")
@@ -195,18 +297,24 @@ def dataio_prep(params):
     # Set output
     sb.dataio.dataset.set_output_keys(datasets, ["id", "sig"])
 
-    # Create dataloaders
-    train_dataloader = sb.dataio.dataloader.make_dataloader(
-        train_data, **params["train_dataloader_opts"]
-    )
-    enrol_dataloader = sb.dataio.dataloader.make_dataloader(
-        enrol_data, **params["enrol_dataloader_opts"]
-    )
-    test_dataloader = sb.dataio.dataloader.make_dataloader(
-        test_data, **params["test_dataloader_opts"]
-    )
+    # Make dicts mapping ids back to indices
+    key2id_Data = {}
+    print("Collecting Data Indices")
+    if os.path.isfile(os.path.join(params["output_folder"], "key2ids.json")):
+        with open(os.path.join(params["output_folder"], "key2ids.json"), 'r') as fp:
+            key2id_Data = json.load(fp)
+    
+    for split in ['train', 'enrol', 'test', 'test_enrol', 'test_test']:
+        if split in key2id_Data:
+            continue
+        data = eval(split + '_data')
+        try:
+            _ = data[0]
+            key2id_Data[split] = {data[i]['id']: i for i in tqdm(range(len(data)))}
+        except:
+            print("Cannot retrieve {} data".format(split))
 
-    return train_dataloader, enrol_dataloader, test_dataloader
+    return train_data, enrol_data, test_data, test_enrol_data, test_test_data, key2id_Data
 
 
 if __name__ == "__main__":
@@ -226,6 +334,11 @@ if __name__ == "__main__":
     )
     download_file(params["verification_file"], veri_file_path)
 
+    test_veri_file_path = os.path.join(
+        params["save_folder"], os.path.basename(params["test_verification_file"])
+    )
+    download_file(params["test_verification_file"], test_veri_file_path)
+
     from absp_voxceleb_prepare import prepare_voxceleb  # noqa E402
 
     # Create experiment directory
@@ -237,11 +350,13 @@ if __name__ == "__main__":
 
     # Prepare data from dev of Voxceleb1
     prepare_voxceleb(
+        vox2022_data_folder=params["vox2022_data_folder"],
         vox2_data_folder=params["vox2_data_folder"],
         vox1_data_folder=params["vox1_data_folder"],
         save_folder=params["save_folder"],
         verification_pairs_file=veri_file_path,
-        splits=["train", "dev", "test"],
+        test_verification_pairs_file=test_veri_file_path,
+        splits=["train", "dev", "test", "test2022"],
         split_ratio=[90, 10],
         seg_dur=3.0,
         source=params["voxceleb_source"]
@@ -250,7 +365,7 @@ if __name__ == "__main__":
     )
 
     # here we create the datasets objects as well as tokenization and encoding
-    train_dataloader, enrol_dataloader, test_dataloader = dataio_prep(params)
+    train_data, enrol_data, test_data, enrol_data_2022, test_data_2022, key2id = dataio_prep(params)
 
     # We download the pretrained LM from HuggingFace (or elsewhere depending on
     # the path given in the YAML file). The tokenizer is loaded at the same time.
@@ -259,29 +374,25 @@ if __name__ == "__main__":
     params["embedding_model"].eval()
     params["embedding_model"].to(params["device"])
 
-    # Computing  enrollment and test embeddings
-    logger.info("Computing enroll/test embeddings...")
+    if params["test"]:
+        # Reading standard verification split
+        with open(test_veri_file_path) as f:
+            veri_test = [line.rstrip() for line in f]
+        scores = get_verification_scores_test(veri_test)
+    else:
+        # Compute the EER
+        logger.info("Computing EER..")
+        # Reading standard verification split
+        with open(veri_file_path) as f:
+            veri_test = [line.rstrip() for line in f]
 
-    # First run
-    enrol_dict = compute_embedding_loop(enrol_dataloader)
-    test_dict = compute_embedding_loop(test_dataloader)
+        # Verification
+        positive_scores, negative_scores = get_verification_scores(veri_test)
+        eer, th = EER(torch.tensor(positive_scores), torch.tensor(negative_scores))
+        logger.info("EER(%%)=%f", eer * 100)
 
-    if "score_norm" in params:
-        train_dict = compute_embedding_loop(train_dataloader)
-
-    # Compute the EER
-    logger.info("Computing EER..")
-    # Reading standard verification split
-    with open(veri_file_path) as f:
-        veri_test = [line.rstrip() for line in f]
-
-    positive_scores, negative_scores = get_verification_scores(veri_test)
-    del enrol_dict, test_dict
-
-    eer, th = EER(torch.tensor(positive_scores), torch.tensor(negative_scores))
-    logger.info("EER(%%)=%f", eer * 100)
-
-    min_dcf, th = minDCF(
-        torch.tensor(positive_scores), torch.tensor(negative_scores)
-    )
-    logger.info("minDCF=%f", min_dcf * 100)
+        # Prevent CPU overflow
+        min_dcf, th = minDCF(
+            torch.tensor(positive_scores[:10000]), torch.tensor(negative_scores[:10000])
+        )
+        logger.info("minDCF=%f", min_dcf * 100)
