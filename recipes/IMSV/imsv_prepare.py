@@ -34,7 +34,8 @@ def prepare_imsv(
     data_folder,
     save_folder,
     verification_pairs_file,
-    test_verification_pairs_file,
+    test_pairs_file,
+    hidden_test_pairs_file,
     splits=["train", "dev", "test"],
     split_ratio=[90, 10], # Train - Dev Split for PLDA only.
     seg_dur=3.0,
@@ -131,16 +132,21 @@ def prepare_imsv(
     if "dev" in splits:
         prepare_csv(seg_dur, wav_lst_dev, save_csv_dev, random_segment, amp_th)
 
+    if "enr" in splits:
+        prepare_csv_enrol_test(
+            data_folder, save_folder, verification_pairs_file
+        )
+
     # For verification
     if "test" in splits:
         prepare_csv_enrol_test(
-            [data_folder], save_folder, verification_pairs_file
+            data_folder, save_folder, test_pairs_file
         )
 
     # For testing
     if "hidden_test" in splits:
         prepare_csv_enrol_test_hidden(
-            [data_folder], save_folder, test_verification_pairs_file
+            data_folder, save_folder, hidden_test_pairs_file
         )
 
     # Saving options (useful to skip this phase when already done)
@@ -165,13 +171,13 @@ def skip(splits, save_folder, conf):
         "train": TRAIN_CSV,
         "dev": DEV_CSV,
         "test": TEST_CSV,
-        "enrol": ENROL_CSV,
+        "enr": ENROL_CSV,
         "hidden_test": HIDDEN_TEST_CSV,
-        "hidden_enrol": HIDDEN_ENROL_CSV
+        "hidden_enr": HIDDEN_ENROL_CSV
     }
 
     for split in splits:
-        if not os.path.isfile(os.path.join(save_folder, split_files[split])):
+        if split not in split_files or not os.path.isfile(os.path.join(save_folder, split_files[split])):
             skip = False
     #  Checking saved options
     save_opt = os.path.join(save_folder, OPT_FILE)
@@ -210,7 +216,6 @@ def _get_utt_split_lists(
             # Speakers present in train and dev splits disjoint sets - For metric learning
             audio_files_dict = {}
             for f in glob.glob(path, recursive=True):
-                print("ad")
                 spk_id = os.path.basename(f).split("_")[0]
                 audio_files_dict.setdefault(spk_id, []).append(f)
 
@@ -373,8 +378,102 @@ def prepare_csv_enrol_test(data_folders, save_folder, verification_pairs_file):
     None
     """
 
-    # To implement after test data is released
-    pass
+    csv_output_head = [
+        ["ID", "duration", "wav", "start", "stop", "spk_id"]
+    ]  # noqa E231
+
+    for data_folder in data_folders:
+
+        test_lst_file = verification_pairs_file
+
+        enrol_files, test_files = [], []
+
+        # Get unique ids (enrol and test utterances)
+        for line in open(test_lst_file):
+            e_files = line.split(" ")[1].rstrip()
+            t_files = line.split(" ")[2].rstrip()
+            enrol_files.append(e_files)
+            test_files.append(t_files)
+
+        enrol_files = list(np.unique(np.array(enrol_files)))
+        test_files = list(np.unique(np.array(test_files)))
+
+        # Prepare enrol csv
+        logger.info("preparing enrol csv")
+        enrol_csv = []
+        for f in tqdm(enrol_files):
+            wav = os.path.join(data_folder, f)
+
+            # Reading the signal (to retrieve duration in seconds)
+            signal, fs = torchaudio.load(wav)
+            signal = signal.squeeze(0)
+            audio_duration = signal.shape[0] / SAMPLERATE
+            start_sample = 0
+            stop_sample = signal.shape[0]
+            wav_name = os.path.basename(wav).strip('.wav')
+            id = wav_name
+            [spk_id, sess_id, device_id, env_id, lang_id, style_id] = [wav_name[:4], wav_name[5], wav_name[6:9], wav_name[9], wav_name[10:12], wav_name[12]]
+
+            csv_line = [
+                id,
+                audio_duration,
+                wav,
+                start_sample,
+                stop_sample,
+                spk_id,
+            ]
+
+            enrol_csv.append(csv_line)
+
+        csv_output = csv_output_head + enrol_csv
+        csv_file = os.path.join(save_folder, ENROL_CSV)
+
+        # Writing the csv lines
+        with open(csv_file, mode="w") as csv_f:
+            csv_writer = csv.writer(
+                csv_f, delimiter=",", quotechar='"', quoting=csv.QUOTE_MINIMAL
+            )
+            for line in csv_output:
+                csv_writer.writerow(line)
+
+        # Prepare test csv
+        logger.info("preparing test csv")
+        test_csv = []
+        for f in tqdm(test_files):
+            wav = os.path.join(data_folder, f)
+
+            # Reading the signal (to retrieve duration in seconds)
+            signal, fs = torchaudio.load(wav)
+            signal = signal.squeeze(0)
+            audio_duration = signal.shape[0] / SAMPLERATE
+            start_sample = 0
+            stop_sample = signal.shape[0]
+            wav_name = os.path.basename(wav).strip('.wav')
+            id = wav_name
+            [spk_id, sess_id, device_id, env_id, lang_id, style_id] = [wav_name[:4], wav_name[5], wav_name[6:9], wav_name[9], wav_name[10:12], wav_name[12]]
+
+            csv_line = [
+                id,
+                audio_duration,
+                wav,
+                start_sample,
+                stop_sample,
+                spk_id,
+            ]
+
+            test_csv.append(csv_line)
+
+        csv_output = csv_output_head + test_csv
+        csv_file = os.path.join(save_folder, TEST_CSV)
+
+        # Writing the csv lines
+        with open(csv_file, mode="w") as csv_f:
+            csv_writer = csv.writer(
+                csv_f, delimiter=",", quotechar='"', quoting=csv.QUOTE_MINIMAL
+            )
+            for line in csv_output:
+                csv_writer.writerow(line)
+
 
 def prepare_csv_enrol_test_hidden(data_folders, save_folder, verification_pairs_file):
     """
