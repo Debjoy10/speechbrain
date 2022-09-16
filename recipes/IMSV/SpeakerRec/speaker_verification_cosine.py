@@ -77,7 +77,8 @@ def get_verification_scores(veri_test):
     negative_scores = []
 
     save_file = os.path.join(params["output_folder"], "scores.txt")
-    s_file = open(save_file, "w")
+    # File format changed from write to append to allow multiple test runs to write into the same scores file
+    s_file = open(save_file, "a")
 
     # Cosine similarity initialization
     similarity = torch.nn.CosineSimilarity(dim=-1, eps=1e-6)
@@ -86,7 +87,8 @@ def get_verification_scores(veri_test):
     if "score_norm" in params:
         train_cohort = torch.stack(list(train_dict.values()))
 
-    for i, line in enumerate(veri_test):
+    print("Computing Scores ...")
+    for i, line in tqdm(enumerate(veri_test), total = len(veri_test)):
 
         # Reading verification file (enrol_file test_file label)
         lab_pair = int(line.split(" ")[0].rstrip().split(".")[0].strip())

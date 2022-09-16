@@ -86,6 +86,11 @@ class SpeakerBrain(sb.core.Brain):
         if stage == sb.Stage.TRAIN:
             spkid = torch.cat([spkid] * self.n_augment, dim=0)
 
+        # TODO
+        # Add a different compute_cost component to hparams file and calculate that loss as well.
+        # From compute forward, 2 predictions, one after passing through the language classifier 
+        # Add (-ve) loss here
+        # New module (linear + classifier) needs to be added to module list defined in hparams
         loss = self.hparams.compute_cost(predictions, spkid, lens)
 
         if stage == sb.Stage.TRAIN and hasattr(
