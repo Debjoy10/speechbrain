@@ -1,3 +1,4 @@
+rm -rf /media/absp/4E897AE46CE3ABFA/IMSV/results/imsv_test/speaker_verification_ecapa_big_trained
 python speaker_verification_cosine.py /home/absp/Debjoy/speechbrain/recipes/IMSV/SpeakerRec/hparams/test_divided_hparams/verification_ecapa_trained_test_aa.yaml
 rm -rf /media/absp/4E897AE46CE3ABFA/IMSV/results/imsv_test/speaker_verification_ecapa_big_trained/save
 python speaker_verification_cosine.py /home/absp/Debjoy/speechbrain/recipes/IMSV/SpeakerRec/hparams/test_divided_hparams/verification_ecapa_trained_test_ab.yaml

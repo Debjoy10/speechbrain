@@ -9,7 +9,6 @@ parser.add_argument('--bash', help='Location of Bash File', default='/home/absp/
 args = parser.parse_args()
 
 def main():
-    bash_cmds = []
     path = args.yaml
     
     # Location of verification_file and output dir location
@@ -20,7 +19,9 @@ def main():
     idx = np.argmax(x)
     z = ['output_folder' in y for y in yaml]
     assert sum(x) == 1
-    output = os.path.join(yaml[np.argmax(z)].strip('output_folder:').strip(), 'save')
+    dir_ = yaml[np.argmax(z)].strip('output_folder:').strip()
+    output = os.path.join(dir_, 'save')
+    bash_cmds = ['rm -rf {}\n'.format(dir_)]
 
     # Write 12 yaml files from one
     for c in ascii_lowercase:
