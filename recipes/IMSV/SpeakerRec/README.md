@@ -20,6 +20,11 @@ python bash/genbash_test.py --yaml YAML  Main Yaml File
 bash bash/< BASH_FILE >
 ```
 
+# To generate the submission file - 
+```
+python submission.py [-h] [--scores_file CSV FILE GENERATED IN TESTING]
+```
+
 ## PreTrained Model + Easy-Inference
 You can find the pre-trained ECAPA-TDNN model with an easy-inference function on [HuggingFace](https://huggingface.co/speechbrain/spkrec-ecapa-voxceleb).
 
