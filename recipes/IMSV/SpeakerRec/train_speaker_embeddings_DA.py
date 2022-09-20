@@ -1,18 +1,18 @@
 #!/usr/bin/python3
-"""Recipe for training speaker embeddings (e.g, xvectors) using the VoxCeleb Dataset.
-We employ an encoder followed by a speaker classifier.
+"""Recipe for training speaker embeddings (e.g, xvectors) using the IMSV Dataset.
+We employ an encoder followed by a speaker classifier and other tasks based on Domain Adversarial Training.
+Key objective is to learn equipment and language agnostic speaker embeddings
 
 To run this recipe, use the following command:
-> python train_speaker_embeddings.py {hyperparameter_file}
+> python train_speaker_embeddings_DA.py {hyperparameter_file}
 
 Using your own hyperparameter file or one of the following:
     hyperparams/train_x_vectors.yaml (for standard xvectors)
     hyperparams/train_ecapa_tdnn.yaml (for the ecapa+tdnn system)
+    (Only supports ECAPA)
 
 Author
-    * Mirco Ravanelli 2020
-    * Hwidong Na 2020
-    * Nauman Dawalatabad 2020
+    * Debjoy Saha 2022
 """
 import os
 import sys
@@ -86,6 +86,11 @@ class SpeakerBrain(sb.core.Brain):
         if stage == sb.Stage.TRAIN:
             spkid = torch.cat([spkid] * self.n_augment, dim=0)
 
+        # TODO
+        # Add a different compute_cost component to hparams file and calculate that loss as well.
+        # From compute forward, 2 predictions, one after passing through the language classifier 
+        # Add (-ve) loss here
+        # New module (linear + classifier) needs to be added to module list defined in hparams
         loss = self.hparams.compute_cost(predictions, spkid, lens)
 
         if stage == sb.Stage.TRAIN and hasattr(
