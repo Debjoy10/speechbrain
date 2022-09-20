@@ -32,7 +32,7 @@ test: False # train = True if no labels provided in CSV File
 
 batch_size: 16
 # Score norm utilises the training data to create cohorts
-score_norm: s-norm  # z-norm t-norm s-norm (uncomment to enable it)
+# score_norm: s-norm  # z-norm t-norm s-norm (uncomment to enable it)
 cohort_size: 100 # amount of imposter utterances in normalization cohort
 n_train_snts: 2000 # used for normalization stats
 

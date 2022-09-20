@@ -9,7 +9,7 @@ __set_seed: !apply:torch.manual_seed [!ref <seed>]
 
 # Folders and train_log file
 data_folder: /media/absp/4E897AE46CE3ABFA/IMSV/I-MSV-DATA
-output_folder: /media/absp/4E897AE46CE3ABFA/IMSV/results/results/imsv/speaker_verification_ecapa_big
+output_folder: /media/absp/4E897AE46CE3ABFA/IMSV/results/imsv_verify/speaker_verification_ecapa_big
 save_folder: !ref <output_folder>/save
 device: 'cuda:0'
 
@@ -32,7 +32,7 @@ test: False # train = True if no labels provided in CSV File
 
 batch_size: 16
 # Score norm utilises the training data to create cohorts
-score_norm: s-norm  # z-norm t-norm s-norm (uncomment to enable it)
+# score_norm: s-norm  # z-norm t-norm s-norm (uncomment to enable it)
 cohort_size: 40 # amount of imposter utterances in normalization cohort
 n_train_snts: 1000 # used for normalization stats
 
