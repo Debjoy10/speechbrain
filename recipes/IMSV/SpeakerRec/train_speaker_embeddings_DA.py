@@ -71,27 +71,29 @@ class SpeakerBrain(sb.core.Brain):
 
         # Embeddings + speaker classifier
         embeddings = self.modules.embedding_model(feats)
-        outputs = self.modules.classifier(embeddings)
+        outputs = [self.modules.classifier(embeddings), self.modules.lang_classifier(embeddings), self.modules.equip_classifier(embeddings)]
 
         return outputs, lens
 
     def compute_objectives(self, predictions, batch, stage):
         """Computes the loss using speaker-id as label.
         """
-        predictions, lens = predictions
+        [predictions, lang_predictions, equip_predictions], lens = predictions
         uttid = batch.id
         spkid, _ = batch.spk_id_encoded
+        langid, _ = batch.lang_id_encoded
+        equipid, _ = batch.equip_id_encoded
 
         # Concatenate labels (due to data augmentation)
         if stage == sb.Stage.TRAIN:
             spkid = torch.cat([spkid] * self.n_augment, dim=0)
+            langid = torch.cat([langid] * self.n_augment, dim=0)
+            equipid = torch.cat([equipid] * self.n_augment, dim=0)
 
-        # TODO
-        # Add a different compute_cost component to hparams file and calculate that loss as well.
-        # From compute forward, 2 predictions, one after passing through the language classifier 
-        # Add (-ve) loss here
-        # New module (linear + classifier) needs to be added to module list defined in hparams
-        loss = self.hparams.compute_cost(predictions, spkid, lens)
+        # Adding additional compute_cost components passed through a GRL (Negative loss component)
+        loss = self.hparams.compute_cost(predictions, spkid, lens) \
+                - 0.01 * self.hparams.compute_cost_DA(lang_predictions, langid, lens) \
+                - 0.01 * self.hparams.compute_cost_DA(equip_predictions, equipid, lens)
 
         if stage == sb.Stage.TRAIN and hasattr(
             self.hparams.lr_annealing, "on_batch_end"
@@ -151,6 +153,8 @@ def dataio_prep(hparams):
 
     datasets = [train_data, valid_data]
     label_encoder = sb.dataio.encoder.CategoricalEncoder()
+    lang_label_encoder = {'GJ': 0, 'BN': 1, 'AS': 2, 'KN': 3, 'EN': 4, 'TM': 5, 'MR': 6, 'TL': 7, 'MZ': 8, 'OR': 9, 'HN': 10, 'ML': 11}
+    equip_label_encoder = {'T01': 0, 'M01': 1, 'H01': 2, 'D01': 3, 'M02': 4}
 
     snt_len_sample = int(hparams["sample_rate"] * hparams["sentence_len"])
 
@@ -175,12 +179,20 @@ def dataio_prep(hparams):
     sb.dataio.dataset.add_dynamic_item(datasets, audio_pipeline)
 
     # 3. Define text pipeline:
-    @sb.utils.data_pipeline.takes("spk_id")
-    @sb.utils.data_pipeline.provides("spk_id", "spk_id_encoded")
-    def label_pipeline(spk_id):
+    @sb.utils.data_pipeline.takes("wav", "spk_id")
+    @sb.utils.data_pipeline.provides("spk_id", "spk_id_encoded", "lang_id", "lang_id_encoded", "equip_id", "equip_id_encoded")
+    def label_pipeline(wav, spk_id):
         yield spk_id
         spk_id_encoded = label_encoder.encode_sequence_torch([spk_id])
         yield spk_id_encoded
+        lang_id = wav[-7:-5]
+        yield lang_id
+        lang_id_encoded = torch.tensor([lang_label_encoder[lang_id]])
+        yield lang_id_encoded
+        equip_id = wav[-11:-8]
+        yield equip_id
+        equip_id_encoded = torch.tensor([equip_label_encoder[equip_id]])
+        yield equip_id_encoded
 
     sb.dataio.dataset.add_dynamic_item(datasets, label_pipeline)
 
@@ -192,7 +204,7 @@ def dataio_prep(hparams):
     )
 
     # 4. Set output:
-    sb.dataio.dataset.set_output_keys(datasets, ["id", "sig", "spk_id_encoded"])
+    sb.dataio.dataset.set_output_keys(datasets, ["id", "sig", "spk_id_encoded", "lang_id_encoded", "equip_id_encoded"])
 
     return train_data, valid_data, label_encoder
 
@@ -241,6 +253,11 @@ if __name__ == "__main__":
 
     # Dataset IO prep: creating Dataset objects and proper encodings for phones
     train_data, valid_data, label_encoder = dataio_prep(hparams)
+    
+    # Load pretrained model, if applcable
+    if "pretrainer" in hparams:
+        run_on_main(hparams["pretrainer"].collect_files)
+        hparams["pretrainer"].load_collected()
 
     # Create experiment directory
     sb.core.create_experiment_directory(
