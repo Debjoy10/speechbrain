@@ -41,27 +41,29 @@ class ResNetSE(nn.Module):
         self.conv1 = nn.Conv2d(1, num_filters[0] , kernel_size=3, stride=1, padding=1)
         self.relu = nn.ReLU(inplace=True)
         self.bn1 = nn.BatchNorm2d(num_filters[0])
-        
 
-        self.layer1 = self._make_layer(block, num_filters[0], layers[0])
-        self.layer2 = self._make_layer(block, num_filters[1], layers[1], stride=(2, 2))
-        self.layer3 = self._make_layer(block, num_filters[2], layers[2], stride=(2, 2))
-        self.layer4 = self._make_layer(block, num_filters[3], layers[3], stride=(2, 2))
+        lyrs = []
+        s = (1, 1)
+        for li in range(len(num_filters)):
+            lyrs.append(self._make_layer(block, num_filters[li],\
+                                           layers[li], stride=s))
+            s = (2, 2)
+        self.layers = nn.ModuleList(lyrs)
 
         outmap_size = int(self.n_mels/8)
 
         self.attention = nn.Sequential(
-            nn.Conv1d(num_filters[3] * outmap_size, 128, kernel_size=1),
+            nn.Conv1d(num_filters[-1] * outmap_size, 128, kernel_size=1),
             nn.ReLU(),
             nn.BatchNorm1d(128),
-            nn.Conv1d(128, num_filters[3] * outmap_size, kernel_size=1),
+            nn.Conv1d(128, num_filters[-1] * outmap_size, kernel_size=1),
             nn.Softmax(dim=2),
             )
 
         if self.encoder_type == "SAP":
-            out_dim = num_filters[3] * outmap_size
+            out_dim = num_filters[-1] * outmap_size
         elif self.encoder_type == "ASP":
-            out_dim = num_filters[3] * outmap_size * 2
+            out_dim = num_filters[-1] * outmap_size * 2
         else:
             raise ValueError('Undefined encoder')
 
@@ -104,11 +106,9 @@ class ResNetSE(nn.Module):
         x = self.relu(x)
         x = self.bn1(x)
 
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-
+        for layer in self.layers:
+            x = layer(x)
+        
         x = x.reshape(x.size()[0],-1,x.size()[-1])
 
         w = self.attention(x)

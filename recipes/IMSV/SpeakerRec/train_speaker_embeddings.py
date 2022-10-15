@@ -164,6 +164,8 @@ def dataio_prep(hparams):
         sig, fs = torchaudio.load(
             wav, num_frames=num_frames, frame_offset=start
         )
+        if fs != 16000:
+            sig = torchaudio.functional.resample(sig, orig_freq=fs, new_freq=16000)
         sig = sig.transpose(0, 1).squeeze(1)
         return sig
 
@@ -239,6 +241,7 @@ if __name__ == "__main__":
 
     # Load pretrained model, if applcable
     if "pretrainer" in hparams:
+        print("Loading pretrained model")
         run_on_main(hparams["pretrainer"].collect_files)
         hparams["pretrainer"].load_collected()
 

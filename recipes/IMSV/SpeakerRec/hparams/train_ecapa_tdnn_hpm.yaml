@@ -6,7 +6,7 @@
 # Basic parameters
 seed: 1986
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
-output_folder: !ref /media/absp/4E897AE46CE3ABFA/IMSV/results/ecapa_augment_16k/<seed>
+output_folder: !ref /media/absp/4E897AE46CE3ABFA/IMSV/results/ecapa_augment_hpm/<seed>
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 
@@ -28,7 +28,7 @@ ckpt_interval_minutes: 15 # save checkpoint every N min
 
 # Training parameters
 number_of_epochs: 10
-batch_size: 2
+batch_size: 8
 lr: 0.001
 base_lr: 0.00000001
 max_lr: !ref <lr>
@@ -54,7 +54,6 @@ dataloader_options:
 
 # Functions
 compute_features: !new:speechbrain.lobes.features.Fbank
-    sample_rate: !ref <sample_rate>
     n_mels: !ref <n_mels>
     left_frames: !ref <left_frames>
     right_frames: !ref <right_frames>

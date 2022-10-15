@@ -6,7 +6,7 @@
 # Basic parameters
 seed: 1986
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
-output_folder: !ref /media/absp/4E897AE46CE3ABFA/IMSV/results/ecapa_augment_16k/<seed>
+output_folder: !ref /media/absp/4E897AE46CE3ABFA/IMSV/results/ecapa_augment_DA_from_pretrained/<seed>
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 
@@ -23,12 +23,18 @@ rir_folder: /media/absp/4E897AE46CE3ABFA/IMSV/RIR_I-MSV-DATA # Change it if need
 # voxceleb verification file created from Enr data:
 verification_file: /media/absp/4E897AE46CE3ABFA/IMSV/I-MSV-DATA/IMSV_Enr_list.txt
 
+# Here, the pretrained embedding model trained with train_speaker_embeddings.py hparams/train_ecapa_tdnn.yaml
+# is downloaded from the speechbrain HuggingFace repository.
+# However, a local path pointing to a directory containing your checkpoints may also be specified
+# instead (see pretrainer below)
+pretrain_path: speechbrain/spkrec-ecapa-voxceleb
+
 skip_prep: False
 ckpt_interval_minutes: 15 # save checkpoint every N min
 
 # Training parameters
-number_of_epochs: 10
-batch_size: 2
+number_of_epochs: 5
+batch_size: 8
 lr: 0.001
 base_lr: 0.00000001
 max_lr: !ref <lr>
@@ -45,7 +51,13 @@ right_frames: 0
 deltas: False
 
 # Number of speakers
-out_n_neurons: 50 #1211 for vox1  # 5994 for vox2, 7205 for vox1+vox2
+out_n_neurons: 50 # 1211 for vox1  # 5994 for vox2, 7205 for vox1+vox2
+
+# Number of languages
+out_n_langs: 12
+
+# Number of recording equipments
+out_n_equips: 5
 
 dataloader_options:
     batch_size: !ref <batch_size>
@@ -54,7 +66,6 @@ dataloader_options:
 
 # Functions
 compute_features: !new:speechbrain.lobes.features.Fbank
-    sample_rate: !ref <sample_rate>
     n_mels: !ref <n_mels>
     left_frames: !ref <left_frames>
     right_frames: !ref <right_frames>
@@ -72,6 +83,14 @@ embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
 classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
     input_size: 192
     out_neurons: !ref <out_n_neurons>
+
+lang_classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
+    input_size: 192
+    out_neurons: !ref <out_n_langs>
+
+equip_classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
+    input_size: 192
+    out_neurons: !ref <out_n_equips>
 
 epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
     limit: !ref <number_of_epochs>
@@ -140,6 +159,8 @@ modules:
     add_rev_noise: !ref <add_rev_noise>
     embedding_model: !ref <embedding_model>
     classifier: !ref <classifier>
+    lang_classifier: !ref <lang_classifier>
+    equip_classifier: !ref <equip_classifier>
     mean_var_norm: !ref <mean_var_norm>
 
 compute_cost: !new:speechbrain.nnet.losses.LogSoftmaxWrapper
@@ -147,7 +168,8 @@ compute_cost: !new:speechbrain.nnet.losses.LogSoftmaxWrapper
         margin: 0.2
         scale: 30
 
-# compute_error: !name:speechbrain.nnet.losses.classification_error
+compute_cost_DA: !new:speechbrain.nnet.losses.LogSoftmaxWrapper
+    loss_fn: !new:torch.nn.Identity
 
 opt_class: !name:torch.optim.Adam
     lr: !ref <lr>
@@ -171,6 +193,15 @@ checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
     recoverables:
         embedding_model: !ref <embedding_model>
         classifier: !ref <classifier>
+        lang_classifier: !ref <lang_classifier>
+        equip_classifier: !ref <equip_classifier>
         normalizer: !ref <mean_var_norm>
         counter: !ref <epoch_counter>
         lr_annealing: !ref <lr_annealing>
+
+pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
+    collect_in: !ref <save_folder>
+    loadables:
+        embedding_model: !ref <embedding_model>
+    paths:
+        embedding_model: !ref <pretrain_path>/embedding_model.ckpt

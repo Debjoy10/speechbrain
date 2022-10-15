@@ -6,7 +6,7 @@ from datetime import datetime
 from zipfile import ZipFile
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--scores_file', help='Scores File', default='/media/absp/4E897AE46CE3ABFA/IMSV/results/imsv_test/speaker_verification_ecapa_big_trained/scores.txt')
+parser.add_argument('--scores_file', help='Scores File')
 parser.add_argument('--clip', help='Whether to clip or normalise negative scores', action='store_true')
 args = parser.parse_args()
 
@@ -14,7 +14,7 @@ def main():
     # Read files 
     with open(args.scores_file) as f:
         scores = f.readlines()
-    with open('/media/absp/4E897AE46CE3ABFA/IMSV/I-MSV-DATA/file_ID.json', 'r') as fp:
+    with open('/media/absp/4E897AE46CE3ABFA/IMSV/I-MSV-DATA/private_file_ID.json', 'r') as fp:
         fileid = json.load(fp)
 
     # Get scores for pairs
@@ -43,7 +43,7 @@ def main():
     now = datetime.now()
     date_time = now.strftime("%m_%d_%Y_%H_%M_%S")
     name = '_'.join(args.scores_file.strip('.txt').split('/')[-2:])
-    zfile = "submissions/submission_{}_{}.zip".format(name, date_time)
+    zfile = "submissions/private_submission_{}_{}.zip".format(name, date_time)
     ZipFile(zfile, mode='w').write('results.csv')
     os.remove('results.csv')
 

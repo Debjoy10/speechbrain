@@ -156,3 +156,4 @@ dmypy.json
 # Mac OS
 .DS_Store
 recipes/IMSV/SpeakerRec/submissions/
+recipes/IMSV/SpeakerRec/scores/

@@ -15,6 +15,7 @@ import os
 import sys
 import torch
 import logging
+import random
 import torchaudio
 import speechbrain as sb
 from tqdm.contrib import tqdm
@@ -23,6 +24,8 @@ from speechbrain.utils.metric_stats import EER, minDCF
 from speechbrain.utils.data_utils import download_file
 from speechbrain.utils.distributed import run_on_main
 
+# For reproducing random crops
+random.seed(0)
 
 # Compute embeddings from the waveforms
 def compute_embedding(wavs, wav_lens):
@@ -48,25 +51,54 @@ def compute_embedding_loop(data_loader, embedding_dict = {}):
     """Computes the embeddings of all the waveforms specified in the
     dataloader.
     """
+    multivote = True    
     with torch.no_grad():
         for batch in tqdm(data_loader, dynamic_ncols=True):
             batch = batch.to(params["device"])
             seg_ids = batch.id
             wavs, lens = batch.sig
             # Restricting Size of Wav Tensor based on GPU size constraints to 20 sec
-            # Do this iteratively for more all crops
-            wavs = wavs[:, :320000]
+            
+            # Do this iteratively for all crops
+            if not multivote or int(lens[0]*wavs.shape[1]) < 320000:
+                # First 20 sec
+                wavs = wavs[:, :320000]
 
-            found = False
-            for seg_id in seg_ids:
-                if seg_id not in embedding_dict:
-                    found = True
-            if not found:
-                continue
-            wavs, lens = wavs.to(params["device"]), lens.to(params["device"])
-            emb = compute_embedding(wavs, lens).unsqueeze(1)
-            for i, seg_id in enumerate(seg_ids):
-                embedding_dict[seg_id] = emb[i].detach().cpu().clone()
+                found = False
+                for seg_id in seg_ids:
+                    if seg_id not in embedding_dict:
+                        found = True
+                if not found:
+                    continue
+                lens = torch.tensor([min(1, l*wavs.shape[1]/320000) for l in lens])
+                wavs, lens = wavs.to(params["device"]), lens.to(params["device"])
+                emb = compute_embedding(wavs, lens).unsqueeze(1)
+                for i, seg_id in enumerate(seg_ids):
+                    embedding_dict[seg_id] = emb[i].detach().cpu().clone()
+            else:
+                # Average over multiple segments
+                segment_len = 320000
+                n_segs = min(1 + int(lens[0]*wavs.shape[1]/segment_len), 20)
+                start_times = random.sample(range(0, int(lens[0]*wavs.shape[1]) - segment_len), n_segs)
+
+                # Check if a new audio signal is encountered
+                found = False
+                for seg_id in seg_ids:
+                    if seg_id not in embedding_dict:
+                        found = True
+                if not found:
+                    continue
+
+                lens = torch.ones_like(lens)
+                for k, start in enumerate(start_times):
+                    wav = wavs[:, start:start+segment_len]
+                    wav, lens = wav.to(params["device"]), lens.to(params["device"])
+                    emb = compute_embedding(wav, lens).unsqueeze(1)
+                    for i, seg_id in enumerate(seg_ids):
+                        if k == 0:
+                            embedding_dict[seg_id] = emb[i].detach().cpu().clone()
+                        else:
+                            embedding_dict[seg_id] = (embedding_dict[seg_id]*k + emb[i].detach().cpu().clone())/(k+1)
     return embedding_dict
 
 
@@ -78,7 +110,7 @@ def get_verification_scores(veri_test):
 
     save_file = os.path.join(params["output_folder"], "scores.txt")
     # File format changed from write to append to allow multiple test runs to write into the same scores file
-    s_file = open(save_file, "a")
+    s_file = open(save_file, "w")
 
     # Cosine similarity initialization
     similarity = torch.nn.CosineSimilarity(dim=-1, eps=1e-6)
@@ -187,6 +219,7 @@ def dataio_prep(params):
         sig, fs = torchaudio.load(
             wav, num_frames=num_frames, frame_offset=start
         )
+        # Add resampling HERE
         sig = sig.transpose(0, 1).squeeze(1)
         return sig
 
