@@ -220,6 +220,9 @@ def dataio_prep(params):
             wav, num_frames=num_frames, frame_offset=start
         )
         # Add resampling HERE
+        if fs != 16000:
+            warnings.warn("Data with different sampling frequency present, might reduce speed")
+            sig = torchaudio.functional.resample(sig, orig_freq=fs, new_freq=16000)
         sig = sig.transpose(0, 1).squeeze(1)
         return sig
 

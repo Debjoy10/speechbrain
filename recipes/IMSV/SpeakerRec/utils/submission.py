@@ -6,7 +6,7 @@ from datetime import datetime
 from zipfile import ZipFile
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--scores_file', help='Scores File', default='/media/absp/4E897AE46CE3ABFA/IMSV/results/imsv_test/speaker_verification_ecapa_big_trained/scores.txt')
+parser.add_argument('--scores_file', help='Scores File', default='/home/tuhin/MTP_Debjoy/IMSV/results/imsv_test/speaker_verification_ecapa_big_trained/scores.txt')
 parser.add_argument('--clip', help='Whether to clip or normalise negative scores', action='store_true')
 args = parser.parse_args()
 
@@ -14,7 +14,7 @@ def main():
     # Read files 
     with open(args.scores_file) as f:
         scores = f.readlines()
-    with open('/media/absp/4E897AE46CE3ABFA/IMSV/I-MSV-DATA/file_ID.json', 'r') as fp:
+    with open('/home/tuhin/MTP_Debjoy/IMSV/I-MSV-DATA/file_ID.json', 'r') as fp:
         fileid = json.load(fp)
 
     # Get scores for pairs

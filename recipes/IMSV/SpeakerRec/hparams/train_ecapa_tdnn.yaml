@@ -6,29 +6,29 @@
 # Basic parameters
 seed: 1986
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
-output_folder: !ref /media/absp/4E897AE46CE3ABFA/IMSV/results/ecapa_augment_16k/<seed>
+output_folder: !ref /home/tuhin/MTP_Debjoy/IMSV/results/ecapa_augment_16k/<seed>
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 
 # Data files
 # data_folder: !PLACEHOLDER  # e.g. /path/to/Voxceleb
 # Train, Dev split both from VoxCeleb2
-data_folder: /media/absp/4E897AE46CE3ABFA/IMSV/I-MSV-DATA
+data_folder: /home/tuhin/MTP_Debjoy/IMSV/I-MSV-DATA
 train_annotation: !ref <save_folder>/train.csv
 valid_annotation: !ref <save_folder>/dev.csv
 
 # Folder to extract data augmentation files
-rir_folder: /media/absp/4E897AE46CE3ABFA/IMSV/RIR_I-MSV-DATA # Change it if needed
+rir_folder: /home/tuhin/MTP_Debjoy/IMSV/RIR_I-MSV-DATA # Change it if needed
 
 # voxceleb verification file created from Enr data:
-verification_file: /media/absp/4E897AE46CE3ABFA/IMSV/I-MSV-DATA/IMSV_Enr_list.txt
+verification_file: /home/tuhin/MTP_Debjoy/IMSV/I-MSV-DATA/IMSV_Enr_list.txt
 
 skip_prep: False
 ckpt_interval_minutes: 15 # save checkpoint every N min
 
 # Training parameters
 number_of_epochs: 10
-batch_size: 2
+batch_size: 16
 lr: 0.001
 base_lr: 0.00000001
 max_lr: !ref <lr>

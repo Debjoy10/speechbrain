@@ -10,7 +10,6 @@ Authors:
   * Andreas Nautsch 2021
 """
 import torch
-from torch import Tensor
 import logging
 from operator import itemgetter
 from torch.utils.data import (
@@ -26,46 +25,6 @@ from collections import Counter
 from scipy.stats import lognorm
 
 logger = logging.getLogger(__name__)
-
-# class HPMSampler(Sampler[int]):
-#     r"""Hard Prototype Mining Sampler
-#     Samples elements from ``[0,..,len(weights)-1]`` with similar embeddings.
-
-#     Args:
-#         embeddings (matrix)   : a matrix of embeddings
-#         num_samples (int): number of samples to draw
-#         replacement (bool): if ``True``, samples are drawn with replacement.
-#             If not, they are drawn without replacement, which means that when a
-#             sample index is drawn for a row, it cannot be drawn again for that row.
-#         generator (Generator): Generator used in sampling.
-#     """
-
-#     weights: Tensor
-#     num_samples: int
-#     replacement: bool
-            
-#     def __init__(self, embeddings: np.ndarray, num_samples: int, tosample: list) -> None:
-#         if not isinstance(num_samples, int) or isinstance(num_samples, bool) or \
-#                 num_samples <= 0:
-#             raise ValueError("num_samples should be a positive integer "
-#                              "value, but got num_samples={}".format(num_samples))
-#         # Embeddings and tosample should be passed at each epoch, not at initialisation
-#         self.embeddings = torch.as_tensor(embeddings, dtype=torch.double)
-#         self.num_samples = num_samples
-#         indices, dim = embeddings.shape
-#         self.indices = indices
-
-#     def __iter__(self) -> Iterator[int]:
-#         idx = random.choice(range(self.indices))
-#         yield idx
-#         cos = nn.CosineSimilarity(dim=1, eps=1e-6)
-#         scores = cos(self.embeddings, self.embeddings[idx].unsqueeze(0).repeat(self.indices, 1))
-#         sel = [x for i, x in enumerate(torch.argsort(scores, dim=0).tolist()) if tosample[i]][:self.num_samples-1]
-#         yield from iter(sel)
-
-#     def __len__(self) -> int:
-#         return self.num_samples
-
 
 class ReproducibleRandomSampler(RandomSampler):
     """A modification of RandomSampler which always returns the same values.

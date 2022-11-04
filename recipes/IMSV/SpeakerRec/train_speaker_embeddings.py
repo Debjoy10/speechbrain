@@ -19,6 +19,7 @@ import sys
 import random
 import torch
 import torchaudio
+import warnings
 import speechbrain as sb
 from speechbrain.utils.data_utils import download_file
 from hyperpyyaml import load_hyperpyyaml
@@ -165,6 +166,7 @@ def dataio_prep(hparams):
             wav, num_frames=num_frames, frame_offset=start
         )
         if fs != 16000:
+            warnings.warn("Data with different sampling frequency present, might reduce speed")
             sig = torchaudio.functional.resample(sig, orig_freq=fs, new_freq=16000)
         sig = sig.transpose(0, 1).squeeze(1)
         return sig

@@ -12,7 +12,7 @@ from speechbrain.dataio.dataio import length_to_mask
 from speechbrain.nnet.CNN import Conv1d as _Conv1d
 from speechbrain.nnet.normalization import BatchNorm1d as _BatchNorm1d
 from speechbrain.nnet.linear import Linear
-
+from pytorch_revgrad import RevGrad
 
 # Skip transpose as much as possible for efficiency
 class Conv1d(_Conv1d):
@@ -538,10 +538,14 @@ class Classifier(torch.nn.Module):
         lin_blocks=0,
         lin_neurons=192,
         out_neurons=1211,
+        grl=False,
     ):
 
         super().__init__()
         self.blocks = nn.ModuleList()
+        if grl:
+            print(" <<<< Gradient Reversal Layer >>>> ")
+            self.blocks.append(RevGrad())
 
         for block_index in range(lin_blocks):
             self.blocks.extend(

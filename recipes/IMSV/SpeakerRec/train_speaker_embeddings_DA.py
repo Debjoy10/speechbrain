@@ -18,6 +18,7 @@ import os
 import sys
 import random
 import torch
+import warnings
 import torchaudio
 import speechbrain as sb
 from speechbrain.utils.data_utils import download_file
@@ -92,8 +93,8 @@ class SpeakerBrain(sb.core.Brain):
 
         # Adding additional compute_cost components passed through a GRL (Negative loss component)
         loss = self.hparams.compute_cost(predictions, spkid, lens) \
-                - 0.01 * self.hparams.compute_cost_DA(lang_predictions, langid, lens) \
-                - 0.01 * self.hparams.compute_cost_DA(equip_predictions, equipid, lens)
+                + 0.01 * self.hparams.compute_cost_DA(lang_predictions, langid, lens) \
+                + 0.01 * self.hparams.compute_cost_DA(equip_predictions, equipid, lens)
 
         if stage == sb.Stage.TRAIN and hasattr(
             self.hparams.lr_annealing, "on_batch_end"
@@ -173,6 +174,9 @@ def dataio_prep(hparams):
         sig, fs = torchaudio.load(
             wav, num_frames=num_frames, frame_offset=start
         )
+        if fs != 16000:
+            warnings.warn("Data with different sampling frequency present, might reduce speed")
+            sig = torchaudio.functional.resample(sig, orig_freq=fs, new_freq=16000)
         sig = sig.transpose(0, 1).squeeze(1)
         return sig
 
@@ -256,6 +260,7 @@ if __name__ == "__main__":
     
     # Load pretrained model, if applcable
     if "pretrainer" in hparams:
+        print("Loading pretrained model")
         run_on_main(hparams["pretrainer"].collect_files)
         hparams["pretrainer"].load_collected()
 
