@@ -6,7 +6,7 @@
 # Basic parameters
 seed: 1986
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
-output_folder: !ref /home/tuhin/MTP_Debjoy/IMSV/results/ecapa_augment_16k/<seed>
+output_folder: !ref /home/tuhin/MTP_Debjoy/IMSV/results/ecapa_augment_16k_pretrained/<seed>
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 
@@ -22,6 +22,12 @@ rir_folder: /home/tuhin/MTP_Debjoy/IMSV/RIR_I-MSV-DATA # Change it if needed
 
 # voxceleb verification file created from Enr data:
 verification_file: /home/tuhin/MTP_Debjoy/IMSV/I-MSV-DATA/IMSV_Enr_list.txt
+
+# Here, the pretrained embedding model trained with train_speaker_embeddings.py hparams/train_ecapa_tdnn.yaml
+# is downloaded from the speechbrain HuggingFace repository.
+# However, a local path pointing to a directory containing your checkpoints may also be specified
+# instead (see pretrainer below)
+pretrain_path: speechbrain/spkrec-ecapa-voxceleb
 
 skip_prep: False
 ckpt_interval_minutes: 15 # save checkpoint every N min
@@ -174,3 +180,10 @@ checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
         normalizer: !ref <mean_var_norm>
         counter: !ref <epoch_counter>
         lr_annealing: !ref <lr_annealing>
+
+pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
+    collect_in: !ref <save_folder>
+    loadables:
+        embedding_model: !ref <embedding_model>
+    paths:
+        embedding_model: !ref <pretrain_path>/embedding_model.ckpt

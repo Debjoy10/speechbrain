@@ -93,8 +93,8 @@ class SpeakerBrain(sb.core.Brain):
 
         # Adding additional compute_cost components passed through a GRL (Negative loss component)
         loss = self.hparams.compute_cost(predictions, spkid, lens) \
-                + 0.01 * self.hparams.compute_cost_DA(lang_predictions, langid, lens) \
-                + 0.01 * self.hparams.compute_cost_DA(equip_predictions, equipid, lens)
+                + self.hparams.compute_cost_DA(lang_predictions, langid, lens) \
+                + self.hparams.compute_cost_DA(equip_predictions, equipid, lens)
 
         if stage == sb.Stage.TRAIN and hasattr(
             self.hparams.lr_annealing, "on_batch_end"

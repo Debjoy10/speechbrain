@@ -30,7 +30,12 @@
 
 # Private
 # python speaker_verification_cosine.py hparams/private/verification_DA_ecapa_test.yaml
-python speaker_verification_cosine.py hparams/private/verification_ecapa_trained_test.yaml
+# python speaker_verification_cosine.py hparams/private/verification_ecapa_trained_test.yaml
 # python speaker_verification_cosine.py hparams/private/verification_DA_ecapa_pretrained_test.yaml
-python speaker_verification_cosine.py hparams/private/verification_ecapa_test.yaml
-python speaker_verification_cosine.py hparams/private/verification_ecapa_trained_pretrained_test.yaml
+# python speaker_verification_cosine.py hparams/private/verification_ecapa_test.yaml
+# python speaker_verification_cosine.py hparams/private/verification_ecapa_trained_pretrained_test.yaml
+
+CUDA_VISIBLE_DEVICES="1" python3 speaker_verification_cosine.py hparams/selftest/verification_ecapa.yaml
+# CUDA_VISIBLE_DEVICES="1" python3 speaker_verification_cosine.py hparams/selftest/verification_ecapa_trained.yaml
+CUDA_VISIBLE_DEVICES="1" python3 speaker_verification_cosine.py hparams/selftest/verification_ecapa_trained_pretrained.yaml
+CUDA_VISIBLE_DEVICES="1" python3 speaker_verification_cosine.py hparams/selftest/verification_DA_ecapa_lossmod_0.01.yaml

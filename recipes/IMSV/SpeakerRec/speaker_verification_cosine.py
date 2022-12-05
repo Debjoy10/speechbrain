@@ -15,6 +15,7 @@ import os
 import sys
 import torch
 import logging
+import warnings
 import random
 import torchaudio
 import speechbrain as sb
@@ -23,6 +24,7 @@ from hyperpyyaml import load_hyperpyyaml
 from speechbrain.utils.metric_stats import EER, minDCF
 from speechbrain.utils.data_utils import download_file
 from speechbrain.utils.distributed import run_on_main
+from tabulate import tabulate
 
 # For reproducing random crops
 random.seed(0)
@@ -105,8 +107,10 @@ def compute_embedding_loop(data_loader, embedding_dict = {}):
 def get_verification_scores(veri_test):
     """Computes positive and negative scores given the verification split."""
     scores = []
-    positive_scores = []
-    negative_scores = []
+    positive_scores = {"ALL": []}
+    negative_scores = {"ALL": []}
+    positive_scores_equip = {}
+    negative_scores_equip = {}
 
     save_file = os.path.join(params["output_folder"], "scores.txt")
     # File format changed from write to append to allow multiple test runs to write into the same scores file
@@ -172,14 +176,30 @@ def get_verification_scores(veri_test):
         s_file.write("%s %s %i %f\n" % (enrol_id, test_id, lab_pair, score))
         scores.append(score)
 
+        # Which Language
+        lang = str(test_id[-3:-1])
+        equip = str(test_id[-7:-4])
+        
         if lab_pair == 1:
-            positive_scores.append(score)
+            positive_scores["ALL"].append(score)
+            if lang not in positive_scores:
+                positive_scores[lang] = []
+            positive_scores[lang].append(score)
+            if equip not in positive_scores_equip:
+                positive_scores_equip[equip] = []
+            positive_scores_equip[equip].append(score)
         else:
-            negative_scores.append(score)
+            negative_scores["ALL"].append(score)
+            if lang not in negative_scores:
+                negative_scores[lang] = []
+            negative_scores[lang].append(score)
+            if equip not in negative_scores_equip:
+                negative_scores_equip[equip] = []
+            negative_scores_equip[equip].append(score)
 
     s_file.close()
     logger.info("Scores written to {}".format(save_file))
-    return positive_scores, negative_scores
+    return positive_scores, negative_scores, positive_scores_equip, negative_scores_equip
 
 
 def dataio_prep(params):
@@ -309,16 +329,27 @@ if __name__ == "__main__":
     with open(veri_file_path) as f:
         veri_test = [line.rstrip() for line in f]
 
-    positive_scores, negative_scores = get_verification_scores(veri_test)
+    positive_scores_lang, negative_scores_lang, positive_scores_equip, negative_scores_equip = get_verification_scores(veri_test)
     del enrol_test_dict
 
     if not params["test"]:
         # Compute the EER
-        logger.info("Computing EER..")
-        eer, th = EER(torch.tensor(positive_scores), torch.tensor(negative_scores))
-        logger.info("EER(%%)=%f", eer * 100)
+        for (positive_scores, negative_scores, label) in [(positive_scores_lang, negative_scores_lang, "Language"), 
+                                                  (positive_scores_equip, negative_scores_equip, "Sensor")]:
+            score_Dict = {}
+            for key in positive_scores.keys():
+                # logger.info("Computing EER for {} language ..".format(key))
+                eer, th = EER(torch.tensor(positive_scores[key]), torch.tensor(negative_scores[key]))
+                # logger.info("EER(%%)=%f", eer * 100)
 
-        min_dcf, th = minDCF(
-            torch.tensor(positive_scores), torch.tensor(negative_scores)
-        )
-        logger.info("minDCF=%f", min_dcf * 100)
+                min_dcf, th = minDCF(
+                    torch.tensor(positive_scores[key]), torch.tensor(negative_scores[key])
+                )
+                # logger.info("minDCF=%f", min_dcf * 100)
+                score_Dict[key] = {}
+                score_Dict[key]["EER"] = eer * 100
+                score_Dict[key]["minDCF"] = min_dcf * 100
+
+            eer_row = ["   EER"] + [v["EER"] for k, v in score_Dict.items()]
+            mindcf_row = ["minDCF"] + [v["minDCF"] for k, v in score_Dict.items()]
+            print(tabulate([eer_row, mindcf_row], headers=[label]+list(score_Dict.keys())))

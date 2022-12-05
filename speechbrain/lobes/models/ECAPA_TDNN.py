@@ -539,13 +539,15 @@ class Classifier(torch.nn.Module):
         lin_neurons=192,
         out_neurons=1211,
         grl=False,
+        da_alpha=0.1,
+        label=""
     ):
 
         super().__init__()
         self.blocks = nn.ModuleList()
         if grl:
-            print(" <<<< Gradient Reversal Layer >>>> ")
-            self.blocks.append(RevGrad())
+            print(" <<<< Gradient Reversal Layer with alpha = {} for {} classifier >>>> ".format(da_alpha, label))
+            self.blocks.append(RevGrad(alpha = da_alpha))
 
         for block_index in range(lin_blocks):
             self.blocks.extend(

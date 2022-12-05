@@ -6,7 +6,7 @@
 # Basic parameters
 seed: 1986
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
-output_folder: !ref /home/tuhin/MTP_Debjoy/IMSV/results/ecapa_augment_16k/<seed>
+output_folder: !ref /home/tuhin/MTP_Debjoy/IMSV/results/ecapa_augment_DA_16k_I2_lossmod_0.01/<seed>
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 
@@ -45,7 +45,13 @@ right_frames: 0
 deltas: False
 
 # Number of speakers
-out_n_neurons: 50 #1211 for vox1  # 5994 for vox2, 7205 for vox1+vox2
+out_n_neurons: 50 # 1211 for vox1  # 5994 for vox2, 7205 for vox1+vox2
+
+# Number of languages
+out_n_langs: 12
+
+# Number of recording equipments
+out_n_equips: 5
 
 dataloader_options:
     batch_size: !ref <batch_size>
@@ -54,7 +60,6 @@ dataloader_options:
 
 # Functions
 compute_features: !new:speechbrain.lobes.features.Fbank
-    sample_rate: !ref <sample_rate>
     n_mels: !ref <n_mels>
     left_frames: !ref <left_frames>
     right_frames: !ref <right_frames>
@@ -72,6 +77,21 @@ embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
 classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
     input_size: 192
     out_neurons: !ref <out_n_neurons>
+    label: "speaker"
+
+lang_classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
+    input_size: 192
+    out_neurons: !ref <out_n_langs>
+    grl: True
+    da_alpha: 0.01
+    label: "language"
+
+equip_classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
+    input_size: 192
+    out_neurons: !ref <out_n_equips>
+    grl: True
+    da_alpha: 0.01
+    label: "sensor"
 
 epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
     limit: !ref <number_of_epochs>
@@ -140,6 +160,8 @@ modules:
     add_rev_noise: !ref <add_rev_noise>
     embedding_model: !ref <embedding_model>
     classifier: !ref <classifier>
+    lang_classifier: !ref <lang_classifier>
+    equip_classifier: !ref <equip_classifier>
     mean_var_norm: !ref <mean_var_norm>
 
 compute_cost: !new:speechbrain.nnet.losses.LogSoftmaxWrapper
@@ -147,7 +169,8 @@ compute_cost: !new:speechbrain.nnet.losses.LogSoftmaxWrapper
         margin: 0.2
         scale: 30
 
-# compute_error: !name:speechbrain.nnet.losses.classification_error
+compute_cost_DA: !new:speechbrain.nnet.losses.LogSoftmaxWrapper
+    loss_fn: !new:torch.nn.Identity
 
 opt_class: !name:torch.optim.Adam
     lr: !ref <lr>
@@ -171,6 +194,8 @@ checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
     recoverables:
         embedding_model: !ref <embedding_model>
         classifier: !ref <classifier>
+        lang_classifier: !ref <lang_classifier>
+        equip_classifier: !ref <equip_classifier>
         normalizer: !ref <mean_var_norm>
         counter: !ref <epoch_counter>
         lr_annealing: !ref <lr_annealing>
