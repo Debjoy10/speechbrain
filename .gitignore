@@ -157,3 +157,5 @@ dmypy.json
 .DS_Store
 recipes/IMSV/SpeakerRec/submissions/
 recipes/IMSV/SpeakerRec/scores/
+recipes/IMSV/SpeakerRec/num_layers
+recipes/IMSV/SpeakerRec/wandb/

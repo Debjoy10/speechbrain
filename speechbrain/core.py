@@ -38,6 +38,7 @@ from speechbrain.dataio.dataloader import LoopedLoader
 from speechbrain.dataio.dataloader import SaveableDataLoader
 from speechbrain.dataio.sampler import DistributedSamplerWrapper
 from speechbrain.dataio.sampler import ReproducibleRandomSampler
+import wandb
 
 logger = logging.getLogger(__name__)
 DEFAULT_LOG_CONFIG = os.path.dirname(os.path.abspath(__file__))
@@ -1011,7 +1012,8 @@ class Brain:
                     loss, self.avg_train_loss
                 )
                 t.set_postfix(train_loss=self.avg_train_loss)
-
+                wandb.log({"train_loss": self.avg_train_loss})
+                
                 # Profile only if desired (steps allow the profiler to know when all is warmed up)
                 if self.profiler is not None:
                     if self.profiler.record_steps:

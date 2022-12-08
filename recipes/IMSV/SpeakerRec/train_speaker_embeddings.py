@@ -24,6 +24,8 @@ import speechbrain as sb
 from speechbrain.utils.data_utils import download_file
 from hyperpyyaml import load_hyperpyyaml
 from speechbrain.utils.distributed import run_on_main
+import wandb
+
 sys.path.append('..')
 
 class SpeakerBrain(sb.core.Brain):
@@ -123,10 +125,20 @@ class SpeakerBrain(sb.core.Brain):
                 train_stats=self.train_stats,
                 valid_stats=stage_stats,
             )
+            
+            # Log stats to wandb
+            print("logging into wandb ...")
+            wandb.log({"lr": old_lr, 
+                       "valid_loss_epoch": stage_stats['loss'], 
+                       "train_loss_epoch": self.train_stats['loss'], 
+                       "valid_ErrorRate": stage_stats['ErrorRate']})
+            
             self.checkpointer.save_and_keep_only(
                 meta={"ErrorRate": stage_stats["ErrorRate"]},
                 min_keys=["ErrorRate"],
             )
+        else:
+            wandb.log({"train_loss_epoch": stage_loss}, step = epoch)
 
 
 def dataio_prep(hparams):
@@ -210,7 +222,10 @@ if __name__ == "__main__":
     # Load hyperparameters file with command-line overrides
     with open(hparams_file) as fin:
         hparams = load_hyperpyyaml(fin, overrides)
-
+    
+    # Start wandb
+    wandb.init(project="MSDG-transformer", entity="debjoy", config=hparams) 
+    
     # Download verification list (to exlude verification sentences from train)
     try:
         veri_file_path = os.path.join(

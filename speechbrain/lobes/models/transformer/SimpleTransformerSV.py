@@ -59,6 +59,8 @@ class TransformerSV(TransformerInterface):
         causal=True,
         custom_emb_module=None,
         normalize_before=False,
+        encoder_module="transformer",
+        attention_type="regularMHA",
     ):
         super().__init__(
             d_model=d_model,
@@ -71,6 +73,8 @@ class TransformerSV(TransformerInterface):
             positional_encoding=None,
             normalize_before=normalize_before,
             causal=causal,
+            encoder_module=encoder_module,
+            attention_type=attention_type,
         )
 
         self.custom_emb_module = custom_emb_module

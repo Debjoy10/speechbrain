@@ -28,7 +28,7 @@ ckpt_interval_minutes: 15 # save checkpoint every N min
 
 # Training parameters
 number_of_epochs: 15
-batch_size: 16
+batch_size: 64
 lr: 0.001
 base_lr: 0.00000001
 max_lr: !ref <lr>
@@ -51,6 +51,11 @@ dataloader_options:
     batch_size: !ref <batch_size>
     shuffle: !ref <shuffle>
     num_workers: 2
+    
+# Model Params
+nhead: 4
+nlayers: 4
+dffn: 256
 
 # Functions
 compute_features: !new:speechbrain.lobes.features.Fbank
@@ -62,9 +67,9 @@ compute_features: !new:speechbrain.lobes.features.Fbank
 
 embedding_model: !new:speechbrain.lobes.models.transformer.SimpleTransformerSV.TransformerSV
     d_model: !ref <n_mels>
-    nhead: 4
-    num_layers: 4
-    d_ffn: 256
+    nhead: !ref <nhead>
+    num_layers: !ref <nlayers>
+    d_ffn: !ref <dffn>
     output_size: 192
 
 classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
