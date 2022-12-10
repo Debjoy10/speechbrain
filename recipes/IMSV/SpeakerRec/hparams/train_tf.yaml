@@ -71,6 +71,7 @@ embedding_model: !new:speechbrain.lobes.models.transformer.SimpleTransformerSV.T
     num_layers: !ref <nlayers>
     d_ffn: !ref <dffn>
     output_size: 192
+    encoder: conformer
 
 classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
     input_size: 192
@@ -128,7 +129,7 @@ augment_pipeline: [
     !ref <add_noise>,
     !ref <add_rev_noise>
 ]
-concat_augment: True
+concat_augment: False
 
 mean_var_norm: !new:speechbrain.processing.features.InputNormalization
     norm_type: sentence
@@ -154,12 +155,7 @@ compute_cost: !new:speechbrain.nnet.losses.LogSoftmaxWrapper
 
 opt_class: !name:torch.optim.Adam
     lr: !ref <lr>
-    weight_decay: 0.000002
-
-lr_annealing: !new:speechbrain.nnet.schedulers.CyclicLRScheduler
-    base_lr: !ref <base_lr>
-    max_lr: !ref <max_lr>
-    step_size: !ref <step_size>
+    weight_decay: 0.0000001
 
 # Logging + checkpoints
 train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger

@@ -56,7 +56,7 @@ class TransformerSV(TransformerInterface):
         d_ffn=512,
         dropout=0.1,
         activation=nn.LeakyReLU,
-        causal=True,
+        causal=False,
         custom_emb_module=None,
         normalize_before=False,
         encoder_module="transformer",
