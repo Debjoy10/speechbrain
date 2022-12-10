@@ -58,7 +58,7 @@ class TransformerSV(TransformerInterface):
         activation=nn.LeakyReLU,
         causal=False,
         custom_emb_module=None,
-        normalize_before=False,
+        normalize_before=True,
         encoder_module="transformer",
         attention_type="regularMHA",
     ):

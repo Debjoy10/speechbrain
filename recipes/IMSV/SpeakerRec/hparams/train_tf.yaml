@@ -6,7 +6,7 @@
 # Basic parameters
 seed: 1986
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
-output_folder: !ref /home/tuhin/MTP_Debjoy/IMSV/results/tf_16k/<seed>
+output_folder: !ref /home/tuhin/MTP_Debjoy/IMSV/results/tf_con_16k/<seed>
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 
@@ -71,7 +71,7 @@ embedding_model: !new:speechbrain.lobes.models.transformer.SimpleTransformerSV.T
     num_layers: !ref <nlayers>
     d_ffn: !ref <dffn>
     output_size: 192
-    encoder: conformer
+    encoder_module: conformer
 
 classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
     input_size: 192
@@ -156,6 +156,8 @@ compute_cost: !new:speechbrain.nnet.losses.LogSoftmaxWrapper
 opt_class: !name:torch.optim.Adam
     lr: !ref <lr>
     weight_decay: 0.0000001
+
+lr_annealing: False
 
 # Logging + checkpoints
 train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
