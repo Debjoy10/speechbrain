@@ -157,7 +157,10 @@ opt_class: !name:torch.optim.Adam
     lr: !ref <lr>
     weight_decay: 0.0000001
 
-lr_annealing: False
+lr_annealing:  !new:speechbrain.nnet.schedulers.LinearScheduler
+    initial_value: !ref <base_lr>
+    final_value: !ref <base_lr>
+    epoch_count: 1
 
 # Logging + checkpoints
 train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
