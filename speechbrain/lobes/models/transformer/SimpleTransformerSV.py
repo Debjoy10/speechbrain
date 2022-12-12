@@ -59,6 +59,7 @@ class TransformerSV(TransformerInterface):
         causal=False,
         custom_emb_module=None,
         normalize_before=True,
+        kernel_size=31,
         encoder_module="transformer",
         attention_type="regularMHA",
     ):
@@ -73,6 +74,7 @@ class TransformerSV(TransformerInterface):
             positional_encoding=None,
             normalize_before=normalize_before,
             causal=causal,
+            kernel_size=kernel_size,
             encoder_module=encoder_module,
             attention_type=attention_type,
         )
