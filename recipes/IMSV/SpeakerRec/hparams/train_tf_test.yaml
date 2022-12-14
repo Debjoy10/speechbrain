@@ -6,7 +6,7 @@
 # Basic parameters
 seed: 1986
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
-output_folder: !ref /home/tuhin/MTP_Debjoy/IMSV/results/ecapa_augment_16k_2/<seed>
+output_folder: !ref /home/tuhin/MTP_Debjoy/IMSV/results/tf_con_16k_test/<seed>
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 
@@ -28,7 +28,7 @@ ckpt_interval_minutes: 15 # save checkpoint every N min
 
 # Training parameters
 number_of_epochs: 15
-batch_size: 16
+batch_size: 2
 lr: 0.001
 base_lr: 0.00000001
 max_lr: !ref <lr>
@@ -37,6 +37,7 @@ sample_rate: 16000
 sentence_len: 2.0 # seconds
 shuffle: True
 random_chunk: True
+langs: ['KN', 'HN', 'ML', 'TL', 'BN']
 
 # Feature parameters
 n_mels: 80
@@ -51,6 +52,13 @@ dataloader_options:
     batch_size: !ref <batch_size>
     shuffle: !ref <shuffle>
     num_workers: 2
+    
+# Model Params
+nhead: 2
+nlayers: 2
+dffn: 32
+clfemb: 16
+kernel_size: 15
 
 # Functions
 compute_features: !new:speechbrain.lobes.features.Fbank
@@ -60,17 +68,17 @@ compute_features: !new:speechbrain.lobes.features.Fbank
     right_frames: !ref <right_frames>
     deltas: !ref <deltas>
 
-embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
-    input_size: !ref <n_mels>
-    channels: [1024, 1024, 1024, 1024, 3072]
-    kernel_sizes: [5, 3, 3, 3, 1]
-    dilations: [1, 2, 3, 4, 1]
-    groups: [1, 1, 1, 1, 1]
-    attention_channels: 128
-    lin_neurons: 192
+embedding_model: !new:speechbrain.lobes.models.transformer.SimpleTransformerSV.TransformerSV
+    d_model: !ref <n_mels>
+    nhead: !ref <nhead>
+    num_layers: !ref <nlayers>
+    d_ffn: !ref <dffn>
+    output_size: !ref <clfemb>
+    encoder_module: conformer
+    kernel_size: !ref <kernel_size>
 
 classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
-    input_size: 192
+    input_size: !ref <clfemb>
     out_neurons: !ref <out_n_neurons>
 
 epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
@@ -151,7 +159,7 @@ compute_cost: !new:speechbrain.nnet.losses.LogSoftmaxWrapper
 
 opt_class: !name:torch.optim.Adam
     lr: !ref <lr>
-    weight_decay: 0.000002
+    weight_decay: 0.0000001
 
 lr_annealing: !new:speechbrain.nnet.schedulers.CyclicLRScheduler
     base_lr: !ref <base_lr>

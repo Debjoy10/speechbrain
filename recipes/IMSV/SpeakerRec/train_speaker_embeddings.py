@@ -250,11 +250,17 @@ if __name__ == "__main__":
             "split_ratio": [90, 10],
             "seg_dur": hparams["sentence_len"],
             "skip_prep": hparams["skip_prep"],
+            "langs": hparams["langs"],
         },
     )
 
     # Dataset IO prep: creating Dataset objects and proper encodings for phones
     train_data, valid_data, label_encoder = dataio_prep(hparams)
+    
+    # Reassign the number of output neurons
+    if len(label_encoder) != hparams["out_n_neurons"]:
+        hparams["out_n_neurons"] = len(label_encoder)
+        print("Reassigning the number of output neurons as {}".format(len(label_encoder)))
 
     # Load pretrained model, if applcable
     if "pretrainer" in hparams:

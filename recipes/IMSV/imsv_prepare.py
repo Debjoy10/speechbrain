@@ -29,6 +29,7 @@ ENROL_CSV = "enrol.csv"
 HIDDEN_TEST_CSV = "hidden_test.csv"
 HIDDEN_ENROL_CSV = "hidden_enrol.csv"
 SAMPLERATE = 16000
+all_langs = ['EN', 'KN', 'HN', 'ML', 'TL', 'BN', 'AS', 'OR', 'MZ', 'TM', 'GJ', 'MR']
 
 def prepare_imsv(
     data_folder,
@@ -43,6 +44,7 @@ def prepare_imsv(
     split_speaker=False,
     random_segment=False,
     skip_prep=False,
+    langs=None,
 ):
     """
     Prepares the csv files for the I-MSV datasets.
@@ -117,6 +119,11 @@ def prepare_imsv(
 
     msg = "\tCreating csv file for the I-MSV Dataset.."
     logger.info(msg)
+    
+    # Checking the language to train on
+    global all_langs
+    if langs is not None:
+        all_langs = langs
 
     # Split data into 90% train and 10% validation (verification split)
     wav_lst_train, wav_lst_dev = _get_utt_split_lists(
@@ -206,6 +213,8 @@ def _get_utt_split_lists(
     """
     train_lst = []
     dev_lst = []
+    global all_langs
+    print("Training with the following languages = {}".format(all_langs))
 
     print("Getting file list...")
     for data_folder in data_folders:
@@ -217,6 +226,8 @@ def _get_utt_split_lists(
             audio_files_dict = {}
             for f in glob.glob(path, recursive=True):
                 spk_id = os.path.basename(f).split("_")[0]
+                if f[-7:-5] not in all_langs:
+                    continue
                 audio_files_dict.setdefault(spk_id, []).append(f)
 
             spk_id_list = list(audio_files_dict.keys())
@@ -233,6 +244,8 @@ def _get_utt_split_lists(
             for f in glob.glob(path, recursive=True):
                 try:
                     spk_id = os.path.basename(f).split("_")[0]
+                    if f[-7:-5] not in all_langs:
+                        continue
                 except ValueError:
                     logger.info(f"Malformed path: {f}")
                     continue
