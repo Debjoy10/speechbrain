@@ -224,7 +224,7 @@ if __name__ == "__main__":
         hparams = load_hyperpyyaml(fin, overrides)
     
     # Start wandb
-    wandb.init(project="MSDG-transformer", entity="debjoy", config=hparams) 
+    wandb.init(project=hparams['wandb_project'], entity="debjoy", config=hparams) 
     
     # Download verification list (to exlude verification sentences from train)
     try:

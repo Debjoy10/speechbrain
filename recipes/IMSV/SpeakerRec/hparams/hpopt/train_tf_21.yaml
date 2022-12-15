@@ -6,7 +6,7 @@
 # Basic parameters
 seed: 1986
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
-output_folder: !ref /home/tuhin/MTP_Debjoy/IMSV/results/tf_con_16k_3/<seed>
+output_folder: !ref /home/tuhin/MTP_Debjoy/IMSV/results/tf_con_16k_HPOPT/<seed>
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 
@@ -27,17 +27,18 @@ skip_prep: False
 ckpt_interval_minutes: 15 # save checkpoint every N min
 
 # Training parameters
-number_of_epochs: 15
+number_of_epochs: 1
 batch_size: 16
-lr: 0.001
+lr: 0.0001
 base_lr: 0.00000001
 max_lr: !ref <lr>
 wdecay: 0.0000001
-step_size: 30000
+step_size: 45000
 sample_rate: 16000
 sentence_len: 2.0 # seconds
 shuffle: True
 random_chunk: True
+wandb_project: MSDG-transformer-HpOpt
 
 # Feature parameters
 n_mels: 80
