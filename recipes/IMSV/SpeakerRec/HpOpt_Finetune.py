@@ -25,6 +25,10 @@ from speechbrain.utils.data_utils import download_file
 from hyperpyyaml import load_hyperpyyaml
 from speechbrain.utils.distributed import run_on_main
 import wandb
+import torch
+from ray import tune, air
+from ray.air import session
+from ray.tune.search.optuna import OptunaSearch
 
 sys.path.append('..')
 
@@ -132,6 +136,7 @@ class SpeakerBrain(sb.core.Brain):
                        "valid_loss_epoch": stage_stats['loss'], 
                        "train_loss_epoch": self.train_stats['loss'], 
                        "valid_ErrorRate": stage_stats['ErrorRate']})
+            session.report({"valid_ErrorRate": stage_stats['ErrorRate']})  
             
             self.checkpointer.save_and_keep_only(
                 meta={"ErrorRate": stage_stats["ErrorRate"]},
@@ -207,6 +212,44 @@ def dataio_prep(hparams):
 
     return train_data, valid_data, label_encoder
 
+# 1. Wrap a PyTorch model in an objective function.
+def objective(config):
+    train_loader, test_loader = load_data()  # Load some data
+    model = ConvNet().to("cpu")  # Create a PyTorch conv net
+    optimizer = torch.optim.SGD(  # Tune the optimizer
+        model.parameters(), lr=config["lr"], momentum=config["momentum"]
+    )
+
+    while True:
+        train(model, optimizer, train_loader)  # Train the model
+        acc = test(model, test_loader)  # Compute test accuracy
+        # Report to Tune
+
+
+
+def objective(config):
+    
+    # Update with config
+    hparams.update(config)
+
+    # Brain class initialization
+    speaker_brain = SpeakerBrain(
+        modules=hparams["modules"],
+        opt_class=hparams["opt_class"],
+        hparams=hparams,
+        run_opts=run_opts,
+        checkpointer=hparams["checkpointer"],
+    )
+
+    # Training
+    speaker_brain.fit(
+        speaker_brain.hparams.epoch_counter,
+        train_data,
+        valid_data,
+        train_loader_kwargs=hparams["dataloader_options"],
+        valid_loader_kwargs=hparams["dataloader_options"],
+    )
+
 
 if __name__ == "__main__":
 
@@ -261,7 +304,7 @@ if __name__ == "__main__":
     if len(label_encoder) != hparams["out_n_neurons"]:
         hparams["out_n_neurons"] = len(label_encoder)
         print("Reassigning the number of output neurons as {}".format(len(label_encoder)))
-
+        
     # Load pretrained model, if applcable
     if "pretrainer" in hparams:
         print("Loading pretrained model")
@@ -275,20 +318,22 @@ if __name__ == "__main__":
         overrides=overrides,
     )
 
-    # Brain class initialization
-    speaker_brain = SpeakerBrain(
-        modules=hparams["modules"],
-        opt_class=hparams["opt_class"],
-        hparams=hparams,
-        run_opts=run_opts,
-        checkpointer=hparams["checkpointer"],
-    )
+    # 2. Define a search space and initialize the search algorithm.
+    search_space = {"lr": tune.loguniform(1e-4, 1e-2), "step_size": tune.uniform(1000, 7000), "wdecay": tune.loguniform(1e-4, 1e-8)}
+    algo = OptunaSearch()
 
-    # Training
-    speaker_brain.fit(
-        speaker_brain.hparams.epoch_counter,
-        train_data,
-        valid_data,
-        train_loader_kwargs=hparams["dataloader_options"],
-        valid_loader_kwargs=hparams["dataloader_options"],
+    # 3. Start a Tune run that maximizes mean accuracy and stops after 5 iterations.
+    tuner = tune.Tuner(
+        objective,
+        tune_config=tune.TuneConfig(
+            metric="valid_ErrorRate",
+            mode="min",
+            search_alg=algo,
+        ),
+        run_config=air.RunConfig(
+            stop={"training_iteration": 5},
+        ),
+        param_space=search_space,
     )
+    results = tuner.fit()
+    print("Best config is:", results.get_best_result().config)
