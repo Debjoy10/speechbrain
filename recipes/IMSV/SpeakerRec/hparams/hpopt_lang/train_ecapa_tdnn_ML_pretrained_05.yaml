@@ -6,7 +6,7 @@
 # Basic parameters
 seed: 1986
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
-output_folder: !ref /home/tuhin/MTP_Debjoy/IMSV/results/tf_con_16k_HPOPT/<seed>
+output_folder: !ref /home/tuhin/MTP_Debjoy/IMSV/results/ecapa_augment_16k_pretrained_HPOPT_ML/<seed>
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 
@@ -23,21 +23,27 @@ rir_folder: /home/tuhin/MTP_Debjoy/IMSV/RIR_I-MSV-DATA # Change it if needed
 # voxceleb verification file created from Enr data:
 verification_file: /home/tuhin/MTP_Debjoy/IMSV/I-MSV-DATA/IMSV_Enr_list.txt
 
+# Here, the pretrained embedding model trained with train_speaker_embeddings.py hparams/train_ecapa_tdnn.yaml
+# is downloaded from the speechbrain HuggingFace repository.
+# However, a local path pointing to a directory containing your checkpoints may also be specified
+# instead (see pretrainer below)
+pretrain_path: speechbrain/spkrec-ecapa-voxceleb
+
 skip_prep: False
 ckpt_interval_minutes: 15 # save checkpoint every N min
 
 # Training parameters
-number_of_epochs: 1
+number_of_epochs: 2
 batch_size: 16
-lr: 0.0001
+lr: 0.001
 base_lr: 0.00000001
 max_lr: !ref <lr>
-wdecay: 0.0000001
 step_size: 30000
 sample_rate: 16000
 sentence_len: 2.0 # seconds
 shuffle: True
 random_chunk: True
+langs: ['ML']
 wandb_project: MSDG-transformer-HpOpt
 
 # Feature parameters
@@ -53,13 +59,6 @@ dataloader_options:
     batch_size: !ref <batch_size>
     shuffle: !ref <shuffle>
     num_workers: 2
-    
-# Model Params
-nhead: 4
-nlayers: 6
-dffn: 2048
-clfemb: 256
-kernel_size: 15
 
 # Functions
 compute_features: !new:speechbrain.lobes.features.Fbank
@@ -69,17 +68,17 @@ compute_features: !new:speechbrain.lobes.features.Fbank
     right_frames: !ref <right_frames>
     deltas: !ref <deltas>
 
-embedding_model: !new:speechbrain.lobes.models.transformer.SimpleTransformerSV.TransformerSV
-    d_model: !ref <n_mels>
-    nhead: !ref <nhead>
-    num_layers: !ref <nlayers>
-    d_ffn: !ref <dffn>
-    output_size: !ref <clfemb>
-    encoder_module: conformer
-    kernel_size: !ref <kernel_size>
+embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
+    input_size: !ref <n_mels>
+    channels: [1024, 1024, 1024, 1024, 3072]
+    kernel_sizes: [5, 3, 3, 3, 1]
+    dilations: [1, 2, 3, 4, 1]
+    groups: [1, 1, 1, 1, 1]
+    attention_channels: 128
+    lin_neurons: 192
 
 classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
-    input_size: !ref <clfemb>
+    input_size: 192
     out_neurons: !ref <out_n_neurons>
 
 epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
@@ -160,7 +159,7 @@ compute_cost: !new:speechbrain.nnet.losses.LogSoftmaxWrapper
 
 opt_class: !name:torch.optim.Adam
     lr: !ref <lr>
-    weight_decay: !ref <wdecay>
+    weight_decay: 0.000002
 
 lr_annealing: !new:speechbrain.nnet.schedulers.CyclicLRScheduler
     base_lr: !ref <base_lr>
@@ -183,3 +182,10 @@ checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
         normalizer: !ref <mean_var_norm>
         counter: !ref <epoch_counter>
         lr_annealing: !ref <lr_annealing>
+
+pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
+    collect_in: !ref <save_folder>
+    loadables:
+        embedding_model: !ref <embedding_model>
+    paths:
+        embedding_model: !ref <pretrain_path>/embedding_model.ckpt
